@@ -142,6 +142,21 @@ textarea.inp{min-height:68px;resize:vertical}
 .foot{display:flex;gap:8px}
 .foot .btn.primary{flex:1;padding:13px}
 .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.paste-zone{border:2px dashed var(--line);border-radius:12px;padding:18px 12px;text-align:center;color:var(--muted);font-size:14px;caret-color:transparent;-webkit-user-select:text;user-select:text}
+.paste-zone:focus{outline:2px solid var(--ink);outline-offset:1px}
+.prices{display:grid;gap:6px}
+.prow{display:grid;grid-template-columns:auto minmax(0,1fr) 92px auto;gap:6px;align-items:center}
+.prow .inp{padding:10px}
+.prow input[type=number]{-moz-appearance:textfield}.prow input::-webkit-inner-spin-button,.prow input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.pick{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);background:none;padding:0;display:grid;place-items:center}
+.pick[aria-pressed="true"]{border-color:var(--ink)}
+.pick[aria-pressed="true"]::after{content:"";width:12px;height:12px;border-radius:50%;background:var(--ink)}
+.p-del{width:36px;height:36px;font-size:18px;color:var(--muted)}
+.hint .cheaper{color:var(--ok);font-weight:600}
+.cmp{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}
+.cmp span{font-size:12px;border-radius:6px;padding:1px 6px;background:var(--sunk);color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.cmp span.on{color:var(--ink);font-weight:600}
+.cmp span.low{background:var(--ok-bg);color:var(--ok)}
 .menu-list{display:grid;gap:8px}
 .menu-list .btn{justify-content:flex-start;padding:12px 14px}
 .note{background:var(--paper);border-radius:12px;padding:12px 14px;font-size:13.5px;line-height:1.6;color:var(--ink)}
@@ -193,12 +208,14 @@ textarea.inp{min-height:68px;resize:vertical}
       <div class="photo-btns">
         <label class="btn" for="f-camera"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>카메라</label>
         <label class="btn" for="f-gallery"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 16l5-5 4 4 2-2 5 5"/></svg>갤러리</label>
+        <button type="button" class="btn" id="pasteBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4h6v3H9z"/></svg>붙여넣기</button>
         <button type="button" class="btn" id="imgUrlBtn">이미지 주소</button>
         <button type="button" class="btn danger" id="photoDel" hidden>사진 빼기</button>
         <input class="vh" type="file" id="f-camera" accept="image/*" capture="environment">
         <input class="vh" type="file" id="f-gallery" accept="image/*">
       </div>
     </div>
+    <div class="paste-zone" id="pasteZone" contenteditable="true" role="textbox" aria-label="사진 붙여넣기 칸" inputmode="none" hidden>여기를 길게 눌러 <b>붙여넣기</b>를 누르세요</div>
     <div class="field" id="imgUrlField" hidden>
       <label for="f-imgurl">이미지 주소</label>
       <input class="inp" id="f-imgurl" type="url" inputmode="url" placeholder="https://… 이미지를 길게 눌러 ‘이미지 주소 복사’">
@@ -211,11 +228,12 @@ textarea.inp{min-height:68px;resize:vertical}
       <input class="inp" id="f-store-custom" placeholder="매장 이름 (예: 빅카메라, 로프트)" hidden></div>
     <div class="field"><span class="lab">카테고리</span><div class="choices" id="catChoices"></div></div>
 
-    <div class="row">
-      <div class="field"><label for="f-price">가격 (엔, 세금 포함)</label><input class="inp" id="f-price" type="number" inputmode="numeric" min="0" placeholder="¥"></div>
-      <div class="field" style="flex:none"><span class="lab">수량</span>
-        <div class="stepper"><button type="button" id="qtyMinus" aria-label="수량 줄이기">−</button><input id="f-qty" type="number" inputmode="numeric" min="1" value="1" aria-label="수량"><button type="button" id="qtyPlus" aria-label="수량 늘리기">+</button></div></div>
+    <div class="field"><span class="lab">가격 (엔, 세금 포함) <span style="font-weight:400">· 동그라미 친 가격이 합계에 들어가요</span></span>
+      <div class="prices" id="priceRows"></div>
+      <button type="button" class="btn" id="addPrice" style="justify-self:start">+ 다른 곳 가격 추가</button>
     </div>
+    <div class="field"><span class="lab">수량</span>
+      <div class="stepper" style="justify-self:start"><button type="button" id="qtyMinus" aria-label="수량 줄이기">−</button><input id="f-qty" type="number" inputmode="numeric" min="1" value="1" aria-label="수량"><button type="button" id="qtyPlus" aria-label="수량 늘리기">+</button></div></div>
     <div class="hint" id="priceHint">가격을 넣으면 원화로 바꿔 보여드려요</div>
 
     <div class="field"><label for="f-url">제품 링크</label>
@@ -310,6 +328,14 @@ const DB = (() => {
 const yen = n => '¥' + Math.round(n).toLocaleString('ja-JP');
 const won = n => '₩' + (Math.round(n / 10) * 10).toLocaleString('ko-KR');
 const lineY = it => (Number(it.price) || 0) * (Number(it.qty) || 1);
+/* each item keeps a list of prices seen at different places; `pick` is the one counted in totals */
+function normalize(it) {
+  if (!Array.isArray(it.prices)) it.prices = Number(it.price) > 0 ? [{ place: it.store || '', price: Number(it.price) }] : [];
+  it.prices = it.prices.filter(p => p && Number(p.price) > 0).map(p => ({ place: String(p.place || ''), price: Math.round(Number(p.price)) }));
+  if (!(it.pick >= 0 && it.pick < it.prices.length)) it.pick = 0;
+  it.price = it.prices.length ? it.prices[it.pick].price : null;
+  return it;
+}
 
 /* ---------- images ---------- */
 const urlCache = new WeakMap();
@@ -345,6 +371,12 @@ function taxBadge(store, list) {
 const ICON_LINK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M10 14a4 4 0 006 0l3-3a4 4 0 00-6-6l-1 1"/><path d="M14 10a4 4 0 00-6 0l-3 3a4 4 0 006 6l1-1"/></svg>';
 const ICON_SHOW = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M10 17h4"/></svg>';
 
+function cmpHtml(it) {
+  const ps = it.prices || [];
+  if (ps.length < 2) return '';
+  const min = Math.min(...ps.map(p => p.price));
+  return `<span class="cmp">${ps.map((p, k) => `<span class="${k === it.pick ? 'on ' : ''}${p.price === min ? 'low' : ''}">${esc(p.place || it.store || '?')} ${yen(p.price)}${p.price === min ? ' 최저' : ''}</span>`).join('')}</span>`;
+}
 function card(it) {
   const src = imgSrc(it);
   const q = Number(it.qty) || 1;
@@ -359,6 +391,7 @@ function card(it) {
         <span class="name">${esc(it.name)}${it.example ? '<span class="ex">예시</span>' : ''}</span>
         ${it.jp ? `<span class="jp" lang="ja">${esc(it.jp)}</span>` : ''}
         ${meta ? `<span class="meta">${esc(meta)}</span>` : ''}
+        ${cmpHtml(it)}
       </button>
       ${(safeUrl || src || it.jp) ? `<div class="acts">
         ${safeUrl ? `<a class="mini" href="${esc(safeUrl)}" target="_blank" rel="noopener">${ICON_LINK}링크</a>` : ''}
@@ -447,6 +480,7 @@ function setStore(v) {
   const isCustom = v === '기타' || (v && !STORES.includes(v));
   $('#storeChoices').innerHTML = chipsHtml([...STORES, '기타'], isCustom ? '기타' : v);
   $('#f-store-custom').hidden = !isCustom;
+  if (draft.prices) renderPrices();
 }
 function setCat(v) { draft.cat = v; $('#catChoices').innerHTML = chipsHtml(CATS.map(c => c[0]), v); }
 $('#storeChoices').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; setStore(b.dataset.v); if (b.dataset.v === '기타') { $('#f-store-custom').value = ''; $('#f-store-custom').focus(); } };
@@ -457,9 +491,40 @@ function showPhoto() {
   $('#photoBox').innerHTML = src ? `<img src="${esc(src)}" alt="" onerror="this.parentNode.textContent='이미지를 불러올 수 없어요'">` : '사진 없음';
   $('#photoDel').hidden = !src;
 }
+const storeLabel = () => (draft.store === '기타' || !STORES.includes(draft.store)) ? ($('#f-store-custom').value.trim() || '기타') : draft.store;
+function renderPrices() {
+  const ph = storeLabel();
+  $('#priceRows').innerHTML = draft.prices.map((p, k) => `<div class="prow" data-i="${k}">
+    <button type="button" class="pick" data-p="pick" aria-pressed="${k === draft.pick}" aria-label="이 가격으로 계산"></button>
+    <input class="inp" id="p-place-${k}" data-p="place" value="${esc(p.place)}" placeholder="${k === 0 ? esc(ph) : '어디서 (예: 마츠키요)'}" aria-label="어디서">
+    <input class="inp" id="p-yen-${k}" data-p="price" type="number" inputmode="numeric" min="0" value="${esc(p.price)}" placeholder="¥" aria-label="가격(엔)">
+    ${draft.prices.length > 1 ? `<button type="button" class="icon-btn p-del" data-p="del" aria-label="이 가격 지우기">×</button>` : '<span style="width:36px"></span>'}
+  </div>`).join('');
+  priceHint();
+}
+$('#priceRows').addEventListener('input', e => {
+  const r = e.target.closest('.prow'); if (!r) return; const k = +r.dataset.i;
+  if (e.target.dataset.p === 'place') draft.prices[k].place = e.target.value;
+  if (e.target.dataset.p === 'price') draft.prices[k].price = e.target.value;
+  priceHint();
+});
+$('#priceRows').addEventListener('click', e => {
+  const b = e.target.closest('[data-p="pick"],[data-p="del"]'); if (!b) return; const k = +b.closest('.prow').dataset.i;
+  if (b.dataset.p === 'pick') draft.pick = k;
+  else { draft.prices.splice(k, 1); if (draft.pick >= draft.prices.length || draft.pick === k) draft.pick = 0; else if (draft.pick > k) draft.pick--; }
+  renderPrices();
+});
+$('#addPrice').onclick = () => { draft.prices.push({ place: '', price: '' }); renderPrices(); $(`#p-place-${draft.prices.length - 1}`).focus(); };
 function priceHint() {
-  const p = Number($('#f-price').value), q = Math.max(1, Number($('#f-qty').value) || 1);
-  $('#priceHint').textContent = p > 0 ? `${yen(p)} × ${q}개 = ${yen(p * q)} ≈ ${won(p * q * S.rate)}  (세전 ${yen(p * q / 1.1)})` : '가격을 넣으면 원화로 바꿔 보여드려요';
+  const q = Math.max(1, Number($('#f-qty').value) || 1);
+  const cur = draft.prices && draft.prices[draft.pick];
+  const p = cur ? Number(cur.price) : 0;
+  if (!(p > 0)) { $('#priceHint').textContent = '가격을 넣으면 원화로 바꿔 보여드려요'; return; }
+  let html = `${yen(p)} × ${q}개 = ${yen(p * q)} ≈ ${won(p * q * S.rate)} (세전 ${yen(p * q / 1.1)})`;
+  let best = null;
+  draft.prices.forEach((x, k) => { const v = Number(x.price); if (v > 0 && v < p && (!best || v < best.v)) best = { v, k }; });
+  if (best) html += `<br><span class="cheaper">${esc(draft.prices[best.k].place || '다른 곳')}이(가) 개당 ${yen(p - best.v)} 더 싸요</span> · 동그라미를 눌러 바꿀 수 있어요`;
+  $('#priceHint').innerHTML = html;
 }
 function urlBtn() { const u = $('#f-url').value.trim(); const ok = /^https?:\/\//i.test(u); $('#urlOpen').hidden = !ok; if (ok) $('#urlOpen').href = u; }
 
@@ -470,7 +535,9 @@ function openEdit(it, prefill) {
   $('#editTitle').textContent = it ? '제품 수정' : '제품 추가';
   $('#f-name').value = src.name || '';
   $('#f-jp').value = src.jp || '';
-  $('#f-price').value = Number(src.price) > 0 ? src.price : '';
+  draft.prices = (src.prices && src.prices.length) ? src.prices.map(p => ({ place: p.place, price: p.price })) : [{ place: '', price: Number(src.price) > 0 ? src.price : '' }];
+  draft.pick = (src.pick >= 0 && src.pick < draft.prices.length) ? src.pick : 0;
+  $('#pasteZone').hidden = true;
   $('#f-qty').value = src.qty || 1;
   $('#f-url').value = src.url || '';
   $('#f-memo').value = src.memo || '';
@@ -480,12 +547,11 @@ function openEdit(it, prefill) {
   $('#f-store-custom').value = (src.store && !STORES.includes(src.store) && src.store !== '기타') ? src.store : '';
   setCat(src.cat || '기타');
   $('#delBtn').hidden = !it; disarm($('#delBtn'), '삭제');
-  showPhoto(); priceHint(); urlBtn();
+  showPhoto(); renderPrices(); urlBtn();
   $('#editSheet').showModal();
   if (!it && !src.name) setTimeout(() => $('#f-name').focus(), 60);
 }
 $('#addBtn').onclick = () => openEdit();
-$('#f-price').oninput = priceHint;
 $('#f-qty').oninput = priceHint;
 $('#qtyMinus').onclick = () => { $('#f-qty').value = Math.max(1, (Number($('#f-qty').value) || 1) - 1); priceHint(); };
 $('#qtyPlus').onclick = () => { $('#f-qty').value = (Number($('#f-qty').value) || 1) + 1; priceHint(); };
@@ -493,7 +559,45 @@ $('#f-url').oninput = urlBtn;
 async function takeFile(e) { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return; draft.photo = await compress(f); draft.imgUrl = ''; $('#f-imgurl').value = ''; $('#imgUrlField').hidden = true; showPhoto(); }
 $('#f-camera').onchange = takeFile;
 $('#f-gallery').onchange = takeFile;
-$('#imgUrlBtn').onclick = () => { $('#imgUrlField').hidden = false; $('#f-imgurl').focus(); };
+/* paste an image copied from a web page ("이미지 복사") */
+async function setPhotoBlob(b) { draft.photo = await compress(b); draft.imgUrl = ''; $('#f-imgurl').value = ''; $('#imgUrlField').hidden = true; $('#pasteZone').hidden = true; showPhoto(); toast('사진을 붙여넣었어요'); }
+async function setImgUrl(u) {
+  // try to keep a copy on the phone so it shows offline; many shops block this, then keep the address
+  try { const r = await withTimeout(fetch(u, { mode: 'cors' }), 6000); if (r.ok) { const b = await r.blob(); if (b.type.startsWith('image/')) { await setPhotoBlob(b); return; } } } catch (e) {}
+  draft.imgUrl = u; draft.photo = null; $('#f-imgurl').value = u; $('#pasteZone').hidden = true; showPhoto(); toast('이미지 주소로 붙여넣었어요 (인터넷 연결 시 보여요)');
+}
+const imgFromHtml = h => { const m = /<img[^>]+src=["']([^"']+)["']/i.exec(h || ''); return m && /^https?:\/\//i.test(m[1]) ? m[1].replace(/&amp;/g, '&') : ''; };
+async function handlePasteData(dt) {
+  const files = [...(dt.files || [])].filter(f => f.type.startsWith('image/'));
+  if (!files.length && dt.items) for (const i of dt.items) if (i.kind === 'file' && i.type.startsWith('image/')) { const f = i.getAsFile(); if (f) files.push(f); }
+  if (files.length) { await setPhotoBlob(files[0]); return true; }
+  const u = imgFromHtml(dt.getData('text/html')) || (/^https?:\/\/\S+$/i.test((dt.getData('text/plain') || '').trim()) ? dt.getData('text/plain').trim() : '');
+  if (u) { await setImgUrl(u); return true; }
+  return false;
+}
+$('#pasteBtn').onclick = async () => {
+  try {
+    if (navigator.clipboard && navigator.clipboard.read) {
+      const list = await navigator.clipboard.read();
+      for (const ci of list) { const t = ci.types.find(x => x.startsWith('image/')); if (t) { await setPhotoBlob(await ci.getType(t)); return; } }
+      for (const ci of list) {
+        if (ci.types.includes('text/html')) { const u = imgFromHtml(await (await ci.getType('text/html')).text()); if (u) { await setImgUrl(u); return; } }
+        if (ci.types.includes('text/plain')) { const s = (await (await ci.getType('text/plain')).text()).trim(); if (/^https?:\/\/\S+$/i.test(s)) { await setImgUrl(s); return; } }
+      }
+      toast('복사된 이미지가 없어요. 웹페이지에서 이미지를 길게 눌러 ‘이미지 복사’를 먼저 해주세요');
+      return;
+    }
+  } catch (e) {}
+  // clipboard access refused: let the person paste by long-press
+  $('#pasteZone').hidden = false; $('#pasteZone').focus();
+};
+$('#pasteZone').addEventListener('paste', async e => { e.preventDefault(); if (!(await handlePasteData(e.clipboardData))) toast('이미지를 찾지 못했어요. ‘이미지 복사’로 복사했는지 확인해주세요'); });
+$('#pasteZone').addEventListener('beforeinput', e => { if (e.inputType !== 'insertFromPaste') e.preventDefault(); });
+$('#editSheet').addEventListener('paste', async e => {
+  if (e.target.closest('input,textarea,#pasteZone')) return;
+  if (await handlePasteData(e.clipboardData)) e.preventDefault();
+});
+$('#imgUrlBtn').onclick =() => { $('#imgUrlField').hidden = false; $('#f-imgurl').focus(); };
 $('#f-imgurl').oninput = () => { const v = $('#f-imgurl').value.trim(); if (/^https?:\/\//i.test(v)) { draft.imgUrl = v; draft.photo = null; } else if (!v) draft.imgUrl = ''; showPhoto(); };
 $('#photoDel').onclick = () => { draft.photo = null; draft.imgUrl = ''; $('#f-imgurl').value = ''; showPhoto(); };
 
@@ -506,11 +610,14 @@ $('#editForm').addEventListener('submit', async e => {
   const it = editing || { id: uid(), created: Date.now(), bought: false };
   Object.assign(it, {
     name, jp: $('#f-jp').value.trim(), store, cat: draft.cat,
-    price: Number($('#f-price').value) > 0 ? Math.round(Number($('#f-price').value)) : null,
+    prices: draft.prices.map((p, k) => ({ place: String(p.place || '').trim() || (k === 0 ? store : ''), price: Number(p.price), chosen: k === draft.pick })).filter(p => p.price > 0),
     qty: Math.max(1, Math.round(Number($('#f-qty').value) || 1)),
     url: $('#f-url').value.trim(), memo: $('#f-memo').value.trim(),
     photo: draft.photo || null, imgUrl: draft.photo ? '' : draft.imgUrl, example: editing ? it.example : false
   });
+  it.pick = Math.max(0, it.prices.findIndex(p => p.chosen));
+  it.prices.forEach(p => delete p.chosen);
+  normalize(it);
   if (!editing) items.push(it);
   await DB.put(it);
   $('#editSheet').close(); render();
@@ -603,7 +710,7 @@ $('#f-import').onchange = async e => {
     let n = 0;
     for (const raw of j.items) {
       if (!raw || !raw.id || !raw.name) continue;
-      const it = Object.assign({}, raw, { photo: typeof raw.photo === 'string' && raw.photo.startsWith('data:') ? fromDataUrl(raw.photo) : null });
+      const it = normalize(Object.assign({}, raw, { photo: typeof raw.photo === 'string' && raw.photo.startsWith('data:') ? fromDataUrl(raw.photo) : null }));
       const k = items.findIndex(x => x.id === it.id); if (k >= 0) items[k] = it; else items.push(it);
       await DB.put(it); n++;
     }
@@ -620,7 +727,7 @@ if ('serviceWorker' in navigator && document.querySelector('link[rel="manifest"]
 
 /* ---------- examples ---------- */
 const EXAMPLES = [
-  { name: '로이히츠보코 동전파스 156매', jp: 'ロイヒつぼ膏 156枚', store: '드럭스토어', cat: '의약품', price: 1280, qty: 1, memo: '엄마 부탁' },
+  { name: '로이히츠보코 동전파스 156매', jp: 'ロイヒつぼ膏 156枚', store: '드럭스토어', cat: '의약품', prices: [{ place: '마츠모토키요시', price: 1280 }, { place: '돈키호테', price: 1180 }], pick: 0, qty: 1, memo: '엄마 부탁' },
   { name: '캔메이크 마시멜로 피니시 파우더', jp: 'キャンメイク マシュマロフィニッシュパウダー', store: '드럭스토어', cat: '화장품', price: 1034, qty: 2, memo: 'MO 컬러' },
   { name: '휴족시간', jp: '休足時間', store: '드럭스토어', cat: '생활용품', price: 698, qty: 2, bought: true },
   { name: '킷캣 일본 한정맛', jp: 'キットカット', store: '돈키호테', cat: '과자·식품', price: 540, qty: 3, memo: '말차, 딸기' },
@@ -630,10 +737,10 @@ const EXAMPLES = [
 /* ---------- boot ---------- */
 async function boot() {
   await DB.open();
-  items = (await DB.all()) || [];
+  items = ((await DB.all()) || []).map(normalize);
   if (!items.length && !LS.get('jshop.seeded', false)) {
     const t = Date.now();
-    items = EXAMPLES.map((x, k) => Object.assign({ id: uid() + k, created: t + k, bought: false, url: '', photo: null, imgUrl: '', example: true }, x));
+    items = EXAMPLES.map((x, k) => normalize(Object.assign({ id: uid() + k, created: t + k, bought: false, url: '', photo: null, imgUrl: '', example: true }, x)));
     for (const i of items) await DB.put(i);
     LS.set('jshop.seeded', true);
   }
